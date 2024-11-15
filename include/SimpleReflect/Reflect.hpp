@@ -153,6 +153,15 @@ struct ReflectMethodOverloadImpl<Ret(Args...)>
 template<typename FuncT>
 inline constexpr ReflectMethodOverloadImpl<FuncT> ReflectMethodImpl = {};
 
+template<typename Cls, typename FuncT>
+struct MemberFunctionPointerHelper;
+
+template<typename Cls, typename Ret, typename ...Args>
+struct MemberFunctionPointerHelper<Cls, Ret(Args...)>
+{
+	using type = Ret (Cls::*)(Args...);
+};
+
 NAMESPACE_END(NS_DETAIL)
 
 template<typename FuncT>
@@ -165,38 +174,76 @@ concept is_reflectable = requires (T t) {
 };
 
 template<typename Func, typename Cls, typename T>
-concept is_for_each_member_invoker = std::is_invocable_v<Func,
-	Cls*, std::string,
-	NS_DETAIL::ReflectMemberTypeRef<T>
+concept is_for_each_member_invoker = std::is_invocable_v<
+	Func,
+	Cls*, std::string, NS_DETAIL::ReflectMemberTypeRef<T>
 >;
+
+template<typename Cls, typename FuncT>
+using MemberFunctionPointer = NS_DETAIL::MemberFunctionPointerHelper<Cls, FuncT>::type;
 
 NAMESPACE_BEGIN(NS_DETAIL)
 
-template<typename Cls, typename MemPtr>
-auto& for_each_member_impl_unwrap_member_pointer(Cls* ptr, MemPtr& mbr)
-{
-	if constexpr (std::is_member_function_pointer_v<MemPtr>)
-		return mbr;
-	else
-		return ptr->*mbr;
-}
-
 template<typename Cls, typename Func, typename ...Tp>
 	requires (is_for_each_member_invoker<Func, Cls, Tp> && ...)
-void for_each_member_impl_expand(Cls* ptr, Func func, NS_DETAIL::ReflectMemberInfo<Tp>& ...pair)
-{ (func(ptr, pair.name, pair.unwrap_member_pointer(ptr)), ...); }
+void for_each_member_impl_expand(Cls* ptr, Func&& func, NS_DETAIL::ReflectMemberInfo<Tp>& ...pair)
+{
+	(std::invoke(
+		std::forward<Func>(func), ptr, pair.name, pair.unwrap_member_pointer(ptr)),
+		...
+	);
+}
 
 template<typename Cls, typename Func, std::size_t ...Indices>
-void for_each_member_impl(Cls* ptr, Func func, std::index_sequence<Indices...>)
-{ for_each_member_impl_expand(ptr, func, std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple)...); }
+void for_each_member_impl(Cls* ptr, Func&& func, std::index_sequence<Indices...>)
+{
+	for_each_member_impl_expand(
+		ptr, std::forward<Func>(func),
+		std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple)...
+	);
+}
+
+template<typename Cls, typename Func, std::size_t ...Indices>
+void visit_member_impl(Func&& func, std::index_sequence<Indices...>)
+{
+	(std::invoke(
+		std::forward<Func>(func), std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple)),
+		...
+	);
+}
 
 NAMESPACE_END(NS_DETAIL)
 
-template<typename Cls, typename Func,
-		 typename Indices = std::make_index_sequence<std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>>>
+template<typename Cls, typename Func>
 	requires is_reflectable<Cls>
-void for_each_member(Cls* ptr, Func func)
-{ NS_DETAIL::for_each_member_impl(ptr, func, Indices{}); }
+void for_each_member(Cls* ptr, Func&& func)
+{
+	using TupleIndex = std::make_index_sequence<
+		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+	>;
+	NS_DETAIL::for_each_member_impl(ptr, std::forward<Func>(func), TupleIndex{});
+}
+
+template<typename Cls, typename Func>
+	requires is_reflectable<Cls>
+void visit_member(Cls* ptr, const std::string& name, Func&& visitor)
+{
+	using TupleIndex = std::make_index_sequence<
+		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+	>;
+	NS_DETAIL::visit_member_impl<Cls>(
+		[&name, visitor, ptr](auto& pair) {
+			using MemberType = std::decay_t<decltype(pair.unwrap_member_pointer(ptr))>;
+			if constexpr (std::is_invocable_v<Func, Cls*, MemberType&>)
+			{
+				if (pair.name != name)
+					return;
+				visitor(ptr, pair.unwrap_member_pointer(ptr));
+			}
+		},
+		TupleIndex{}
+	);
+}
 
 
 NAMESPACE_END(NS_REFLECT)

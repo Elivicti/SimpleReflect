@@ -181,5 +181,12 @@ int main()
 	::print("--- Displaying members of y:\n");
 	Reflect::for_each_member(&y, print_member{});
 
+	::print("------------------\n");
+	Reflect::visit_member(&y, "func_int",
+		[](decltype(y)* ptr, Reflect::MemberFunctionPointer<Y, void(int)>& func_int) {
+			std::invoke(func_int, ptr, 123456);
+		}
+	);
+
 	return 0;
 }
