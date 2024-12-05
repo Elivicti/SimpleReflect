@@ -21,6 +21,30 @@
 
 NAMESPACE_BEGIN(NS_REFLECT)
 
+#ifdef _L
+#undef _L
+#endif
+
+#if defined(UNICODE) || defined(_UNICODE) || defined(USE_WCHAR)
+#ifndef USE_WCHAR
+#define USE_WCHAR 1
+#endif
+
+#define _L_IMPL_R(x) L ## x
+#define _L(x) _L_IMPL_R(x)
+
+using String = std::wstring;
+using StringView = std::wstring_view;
+#else
+
+#define _L_IMPL_R(x) x
+#define _L(x) x
+
+using String = std::string;
+using StringView = std::string_view;
+#endif
+
+
 template <typename T, template <typename...> typename Template>
 struct is_specialization : std::false_type {};
 
@@ -49,7 +73,7 @@ template<typename Tp>
 	requires std::is_member_pointer_v<Tp>
 struct ReflectMemberInfo
 {
-	std::string name;
+	String name;
 	Tp member_ptr;
 
 	template<typename Cls>
@@ -140,14 +164,14 @@ template<typename Ret, typename ...Args>
 struct ReflectMethodOverloadImpl<Ret(Args...)>
 {
 	template<typename Cls>
-	constexpr auto operator()(std::string_view name, Ret (Cls::*ptr)(Args...)) const
+	constexpr auto operator()(StringView name, Ret (Cls::*ptr)(Args...)) const
 		-> ReflectMemberInfo<decltype(ptr)>
-	{ return ReflectMemberInfo{std::string{name}, ptr}; }
+	{ return ReflectMemberInfo{String{name}, ptr}; }
 
 	template<typename Cls>
-	constexpr auto operator()(std::string_view name, Ret (Cls::*ptr)(Args...) const) const
+	constexpr auto operator()(StringView name, Ret (Cls::*ptr)(Args...) const) const
 		-> ReflectMemberInfo<decltype(ptr)>
-	{ return ReflectMemberInfo{std::string{name}, ptr}; }
+	{ return ReflectMemberInfo{String{name}, ptr}; }
 };
 
 template<typename FuncT>
@@ -176,7 +200,7 @@ concept is_reflectable = requires (T t) {
 template<typename Func, typename Cls, typename T>
 concept is_for_each_member_invoker = std::is_invocable_v<
 	Func,
-	Cls*, std::string, NS_DETAIL::ReflectMemberTypeRef<T>
+	Cls*, String, NS_DETAIL::ReflectMemberTypeRef<T>
 >;
 
 template<typename Cls, typename FuncT>
@@ -226,7 +250,7 @@ void for_each_member(Cls* ptr, Func&& func)
 
 template<typename Cls, typename Func>
 	requires is_reflectable<Cls>
-void visit_member(Cls* ptr, const std::string& name, Func&& visitor)
+void visit_member(Cls* ptr, const String& name, Func&& visitor)
 {
 	using TupleIndex = std::make_index_sequence<
 		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
@@ -264,7 +288,11 @@ NAMESPACE_END(NS_REFLECT)
 
 
 #define REFLECT_MEMBER_IMPL_2(name, member) NS_REFLECT::NS_DETAIL::ReflectMemberInfo{ name, &ThisClass::member }
+#ifdef USE_WCHAR
+#define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(_L(#member), member)
+#else
 #define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(#member, member)
+#endif
 #define REFLECT_MEMBER_IMPL_GET(_1, _2, NAME, ...) NAME
 
 // usage: REFLECT_MEMBER(name, member) or REFLECT_MEMBER(member)
