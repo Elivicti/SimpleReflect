@@ -27,21 +27,28 @@ enum class HttpStatus
 // By default, enum reflection will only recognize enum value between 0 and 64
 // By specializing this template class, you can specify the max value of enums
 template<>
-struct Reflect::enums::ReflectConfig<HttpStatus>
-	: Reflect::enums::Config<(std::size_t)HttpStatus::NotFound> {};
-// Inheritance of Reflect::enums::Config class is not needed,
+struct Reflect::Enums::ReflectConfig<HttpStatus>
+	: Reflect::Enums::Config<(std::size_t)HttpStatus::NotFound> {};
+// Inheritance of Reflect::Enums::Config class is not needed,
 // just make sure specialized ReflectConfig class has required static members.
 
 int main()
 {
-	using Reflect::enums::to_string;
-	std::cout << to_string(Colors::Red)   << '\n';
-	std::cout << to_string(Colors::Green) << '\n';
-	std::cout << to_string(Colors::Blue)  << '\n';
+	Reflect::Enums::EntryArray arr{ Reflect::Enums::entries<Colors>() };
+	for (const auto& [ name, value ] : arr)
+	{
+		print("{} {}\n", name, (int)value);
+	}
+
+	print("----------------------------\n");
+	using Reflect::Enums::to_string;
+	print("{}\n", to_string(Colors::Red));
+	print("{}\n", to_string(Colors::Green));
+	print("{}\n", to_string(Colors::Blue));
 
 	HttpStatus code;
 	code = (HttpStatus)404;
 
-	std::cout << to_string(code) << '\n';
+	print("{}\n", to_string(code));
 	return 0;
 }

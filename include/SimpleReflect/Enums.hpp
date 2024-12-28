@@ -1,56 +1,19 @@
 #ifndef __SIMPLE_REFLECT_ENUMS_HEADER__
 #define __SIMPLE_REFLECT_ENUMS_HEADER__
 
-#include "Reflect.hpp"
+#include "Defines.hpp"
 
+#include <array>
 #include <cstdint>
 #include <algorithm>
-#include <source_location>
 
 #ifndef NS_ENUMS
-#define NS_ENUMS   enums
+#define NS_ENUMS Enums
 #endif
 
-NAMESPACE_BEGIN(NS_REFLECT)
-
-template<std::size_t N, typename CharT = char>
-struct static_string
-{
-	constexpr static_string() noexcept
-		: content{ 0 } {}
-
-	constexpr static_string(std::basic_string_view<CharT> sv) noexcept
-		: content{ 0 }
-	{
-		auto begin = sv.begin();
-		auto size = N <= sv.size() ? N : sv.size();
-		std::copy(begin, begin + size, content);
-	}
-
-	constexpr operator std::basic_string_view<CharT>() const noexcept
-	{
-		return std::basic_string_view<CharT>{ content, N };
-	}
-
-	constexpr CharT* data() noexcept { return content; }
-	constexpr const CharT* data() const noexcept { return content; }
-
-private:
-	CharT content[N + 1];
-
-public:
-	template<std::size_t Len>
-	constexpr static_string<N + Len, CharT> operator+(const static_string<Len, CharT>& str) const
-	{
-		static_string<N + Len, CharT> ret;
-		std::copy(content, content + N, ret.data());
-		std::copy(str.data(), str.data() + Len, ret.data() + N + 1);
-		return ret;
-	}
-};
-
-NAMESPACE_END(NS_REFLECT)
-
+#ifdef USE_WCHAR
+#warning "Enum reflection depends on std::source_location, which can not return wchar_t string"
+#endif
 
 NAMESPACE_BEGIN(NS_REFLECT)
 NAMESPACE_BEGIN(NS_ENUMS)
@@ -69,120 +32,148 @@ template<typename Enum>
 struct ReflectConfig : Config<> {};
 
 NAMESPACE_BEGIN(NS_DETAIL)
+enum class EnumNameHelper { VOID };
+
 template<typename Enum, Enum V>
-constexpr std::string_view pretty_name(std::source_location loc = std::source_location::current()) noexcept
+inline constexpr std::string_view enum_value_name() noexcept;
+
+template<>
+inline constexpr std::string_view enum_value_name<EnumNameHelper, EnumNameHelper::VOID>() noexcept
 {
-	constexpr auto& npos = std::string_view::npos;
+#if defined(_MSC_VER)
+#define EXPAND(x) #x
+#define CONCAT_NS_STR(ns1, ns2, ns3, str) EXPAND(ns1) "::" EXPAND(ns2) "::" EXPAND(ns3) "::" str
+	return CONCAT_NS_STR(NS_REFLECT, NS_ENUMS, NS_DETAIL, "EnumNameHelper::VOID");
+#undef EXPAND
+#undef CONCAT_NS_STR
+#else
+	return "EnumNameHelper::VOID";
+#endif
+}
 
-	std::string_view name{ loc.function_name() };
-	auto begin = name.find("Enum V = ") + 9;
-	auto end = name.find_first_of(';', begin);
-	
-	std::string_view pretty{ name.substr(begin, end - begin) };
+template<typename Enum, Enum V>
+inline constexpr std::string_view wrapped_enum_value_name() noexcept
+{ return std::source_location::current().function_name(); }
 
-	if (pretty.find('(') != npos || pretty.find(')') != npos)
-		return "";
-	
-	if (auto pos = pretty.find_last_of(':'); pos != npos)
-		pretty.remove_prefix(pos + 1);
-
-	return pretty;
+template<typename Enum>
+inline constexpr std::size_t wrapped_enum_value_name_prefix_length() noexcept
+{
+    constexpr auto prefix_len = wrapped_enum_value_name<EnumNameHelper, EnumNameHelper::VOID>()
+            .find(enum_value_name<EnumNameHelper, EnumNameHelper::VOID>());
+    constexpr auto real_prefix_len = prefix_len
+        - (TypeName<EnumNameHelper>.length() - TypeName<Enum>.length());
+	return real_prefix_len;
+}
+inline constexpr std::size_t wrapped_enum_value_name_suffix_length() noexcept
+{
+	return wrapped_enum_value_name<EnumNameHelper, EnumNameHelper::VOID>().length()
+		- wrapped_enum_value_name_prefix_length<EnumNameHelper>()
+		- enum_value_name<EnumNameHelper, EnumNameHelper::VOID>().length();
 }
 template<typename Enum, Enum V>
-constexpr std::string_view name_sv() noexcept
+inline constexpr std::string_view enum_value_name() noexcept
 {
-	return pretty_name<Enum, V>();
+	constexpr auto wrapped_name = wrapped_enum_value_name<Enum, V>();
+	constexpr auto prefix_length = wrapped_enum_value_name_prefix_length<Enum>();
+	constexpr auto suffix_length = wrapped_enum_value_name_suffix_length();
+	constexpr auto type_name_length = wrapped_name.length() - prefix_length - suffix_length;
+	return wrapped_name.substr(prefix_length, type_name_length);
 }
-NAMESPACE_END(NS_DETAIL)
 
 template<typename Enum, Enum V>
-constexpr auto name() noexcept
+constexpr bool is_valid() noexcept
 {
-	constexpr std::string_view sv{ NS_DETAIL::name_sv<Enum, V>() };
-	return static_string<sv.size()>{ sv };
-}
-template<typename Enum, Enum V>
-inline constexpr auto name_v = NS_DETAIL::name_sv<Enum, V>();
-
-NAMESPACE_BEGIN(NS_DETAIL)
-template<typename Enum, Enum V>
-constexpr auto is_valid()
-{
-	constexpr Enum v = static_cast<Enum>(V);
-	return !name_v<Enum, V>.empty();
+	constexpr std::string_view name{ enum_value_name<Enum, V>() };
+	if (name.find("(") != std::string_view::npos)
+		return false;
+	return !name.empty();
 }
 
 template<typename Enum>
-constexpr auto ualue(std::size_t v)
+constexpr auto get_enum_value(std::size_t v)
 {
 	using Config = ReflectConfig<Enum>;
 	return static_cast<Enum>(Config::min + v);
 }
 
 template<typename Enum, std::size_t... I>
-constexpr auto valid_count(std::index_sequence<I...>)
+constexpr std::size_t valid_value_count(std::index_sequence<I...>)
 {
-	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, ualue<Enum>(I)>()... };
+	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, get_enum_value<Enum>(I)>()... };
 	return std::count_if(valid, valid + sizeof...(I), [](bool v) { return v; });
 }
 
 template<typename Enum, std::size_t... I>
-constexpr auto values_impl(std::index_sequence<I...>) noexcept
+constexpr auto valid_values(std::index_sequence<I...>)
 {
-	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, ualue<Enum>(I)>()... };
-	constexpr auto num_valid = std::count_if(valid, valid + sizeof...(I), [](bool v) { return v; });
-	static_assert(num_valid > 0, "no support for empty enums");
+	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, get_enum_value<Enum>(I)>()... };
+	constexpr std::size_t valid_count = std::count_if(valid, valid + sizeof...(I), [](bool v) { return v; });
 	
-	std::array<Enum, num_valid> values{};
-	for(std::size_t offset = 0, n = 0; n < num_valid; ++offset) {
-		if (valid[offset]) {
-			values[n] = ualue<Enum>(offset);
+	std::array<Enum, valid_count> values{};
+	for(std::size_t offset = 0, n = 0; n < valid_count; ++offset) {
+		if (valid[offset])
+		{
+			values[n] = get_enum_value<Enum>(offset);
 			++n;
 		}
 	}
 	return values;
 }
+
 template<typename Enum>
 constexpr auto values() noexcept
-	-> std::array<Enum, valid_count<Enum>(std::make_index_sequence<ReflectConfig<Enum>::max - ReflectConfig<Enum>::min + 1>{})>
 {
-	using Conf = ReflectConfig<Enum>;
-	constexpr auto enum_size = Conf::size();
-	return values_impl<Enum>(std::make_index_sequence<enum_size>{});
+	using Config = ReflectConfig<Enum>;
+	return valid_values<Enum>(std::make_index_sequence<Config::size()>{});
 }
+
+template<typename Enum>
+inline constexpr auto enum_values_v = values<Enum>();
+
 NAMESPACE_END(NS_DETAIL)
 
 template<typename Enum>
-using Entry = std::pair<Enum, std::string_view>;
+struct Entry
+{
+	std::string_view name;
+	Enum value;	
+};
 
 template<typename Enum, std::size_t N>
 using EntryArray = std::array<Entry<Enum>, N>;
 
-template<typename Enum>
-inline constexpr auto values_v = NS_DETAIL::values<Enum>();
-
 NAMESPACE_BEGIN(NS_DETAIL)
+
 template<typename Enum, std::size_t... I>
 constexpr auto entries_impl(std::index_sequence<I...>) noexcept
-	-> EntryArray<Enum, values_v<Enum>.size()>
+	-> EntryArray<Enum, enum_values_v<Enum>.size()>
 {
-    return EntryArray<Enum, values_v<Enum>.size()>{
-		{{ values_v<Enum>[I], name_v<Enum, values_v<Enum>[I]>}...}
+    return EntryArray<Enum, enum_values_v<Enum>.size()>{
+		{{ enum_value_name<Enum, enum_values_v<Enum>[I]>(), enum_values_v<Enum>[I] }...}
     };
 }
+
 NAMESPACE_END(NS_DETAIL)
 
 template<typename Enum>
-constexpr auto entries() noexcept
-	-> EntryArray<Enum, values_v<Enum>.size()>
+constexpr std::size_t valid_entry_count() noexcept
 {
-    return NS_DETAIL::entries_impl<Enum>(std::make_index_sequence<values_v<Enum>.size()>());
+	using Idx = std::make_index_sequence<ReflectConfig<Enum>::size()>;
+	return (std::size_t)NS_DETAIL::valid_value_count<Enum>(Idx{});
+}
+
+template<typename Enum>
+constexpr auto entries() noexcept
+	-> EntryArray<Enum, NS_DETAIL::enum_values_v<Enum>.size()>
+{
+	using Idx = std::make_index_sequence<NS_DETAIL::enum_values_v<Enum>.size()>;
+    return NS_DETAIL::entries_impl<Enum>(Idx{});
 }
 template<typename Enum>
-constexpr std::string_view to_string(Enum value) noexcept
+constexpr std::string_view to_string(Enum v) noexcept
 {
-	for (const auto& [ key, name ]: entries<Enum>()) {
-        if (value == key) return name;
+	for (const auto& [ name, value ]: entries<Enum>()) {
+        if (v == value) return name;
     }
 	return {};
 }
