@@ -7,26 +7,6 @@ void print(std::format_string<Args...> fmt, Args&& ...args)
 {
 	std::format_to(std::ostreambuf_iterator<char>(std::cout), fmt, std::forward<Args>(args)...);
 }
-
-#ifdef __GNUC__
-#include <cxxabi.h>
-#endif
-
-template<typename T>
-std::string TypeName()
-{
-	#ifdef __GNUC__
-	std::size_t len = 0;
-	char* buf = __cxxabiv1::__cxa_demangle(typeid(T).name(), nullptr, &len, nullptr);
-	std::string ret{ buf, len };
-	std::free(buf);
-	#else
-	std::string ret{ typeid(T).name() };
-	#endif
-
-	return ret;
-}
-
 #include "SimpleReflect/Reflect.hpp"
 
 struct A
@@ -122,22 +102,22 @@ struct print_member
 
 		if constexpr (Reflect::is_reflectable<Member>)
 		{
-			::print("{}: ({})\n", name, TypeName<Member>());
+			::print("{}: ({})\n", name, Reflect::TypeName<Member>);
 			Reflect::for_each_member(&mbr, print_member{ indent + 1 });
 		}
 		else if constexpr (std::is_invocable_v<Member, Cls*>)
 		{
-			::print("{}: {}; ", name, TypeName<Member>());
+			::print("{}: {}; ", name, Reflect::TypeName<Member>);
 			std::invoke(mbr, ptr);
 		}
 		else if constexpr (std::is_invocable_v<Member, Cls*, int>)
 		{
-			::print("{}: {}; ", name, TypeName<Member>());
+			::print("{}: {}; ", name, Reflect::TypeName<Member>);
 			std::invoke(mbr, ptr, 255);
 		}
 		else if constexpr (std::is_member_function_pointer_v<Member> || !::formattable<Member>)
 		{
-			::print("{}: {}\n", name, TypeName<Member>());
+			::print("{}: {}\n", name, Reflect::TypeName<Member>);
 		}
 		else if constexpr (std::is_same_v<Member, std::uint32_t>)
 		{

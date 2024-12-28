@@ -1,49 +1,11 @@
 #ifndef __SIMPLE_REFLECT_HEADER__
 #define __SIMPLE_REFLECT_HEADER__
 
-#include <string>
-#include <type_traits>
 #include <tuple>
-
-#ifndef NAMESPACE_BEGIN
-#define NAMESPACE_BEGIN(ns) namespace ns {
-#endif
-
-#ifndef NAMESPACE_END
-#define NAMESPACE_END(ns) }
-#endif
-
-#ifndef NS_DETAIL
-#define NS_DETAIL detail
-#endif
-
-#define NS_REFLECT Reflect
+#include <functional>
+#include "Defines.hpp"
 
 NAMESPACE_BEGIN(NS_REFLECT)
-
-#ifdef _L
-#undef _L
-#endif
-
-#if defined(UNICODE) || defined(_UNICODE) || defined(USE_WCHAR)
-#ifndef USE_WCHAR
-#define USE_WCHAR 1
-#endif
-
-#define _L_IMPL_R(x) L ## x
-#define _L(x) _L_IMPL_R(x)
-
-using String = std::wstring;
-using StringView = std::wstring_view;
-#else
-
-#define _L_IMPL_R(x) x
-#define _L(x) x
-
-using String = std::string;
-using StringView = std::string_view;
-#endif
-
 
 template <typename T, template <typename...> typename Template>
 struct is_specialization : std::false_type {};
