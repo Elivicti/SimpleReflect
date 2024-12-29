@@ -19,19 +19,23 @@ NAMESPACE_BEGIN(NS_REFLECT)
 NAMESPACE_BEGIN(NS_ENUMS)
 
 template<std::size_t MAX = 64, std::size_t MIN = 0>
-struct Config
+struct ConfigBase
 {
-	constexpr inline static const std::size_t max = MAX;
-	constexpr inline static const std::size_t min = MIN;
-
-	constexpr static std::size_t size()
-	{ return max - min + 1; }
+	constexpr static const std::size_t max = MAX;
+	constexpr static const std::size_t min = MIN;
 };
 
 template<typename Enum>
-struct ReflectConfig : Config<> {};
+struct ReflectConfig : ConfigBase<> {};
 
 NAMESPACE_BEGIN(NS_DETAIL)
+template<typename Enum>
+constexpr std::size_t enum_size() noexcept
+{
+	using Config = ReflectConfig<Enum>;
+	return Config::max - Config::min + 1;
+}
+
 enum class EnumNameHelper { VOID };
 
 template<typename Enum, Enum V>
@@ -123,8 +127,8 @@ constexpr auto valid_values(std::index_sequence<I...>)
 template<typename Enum>
 constexpr auto values() noexcept
 {
-	using Config = ReflectConfig<Enum>;
-	return valid_values<Enum>(std::make_index_sequence<Config::size()>{});
+	constexpr std::size_t size = enum_size<Enum>();
+	return valid_values<Enum>(std::make_index_sequence<size>{});
 }
 
 template<typename Enum>
@@ -136,7 +140,7 @@ template<typename Enum>
 struct Entry
 {
 	std::string_view name;
-	Enum value;	
+	Enum value;
 };
 
 template<typename Enum, std::size_t N>
@@ -158,7 +162,8 @@ NAMESPACE_END(NS_DETAIL)
 template<typename Enum>
 constexpr std::size_t valid_entry_count() noexcept
 {
-	using Idx = std::make_index_sequence<ReflectConfig<Enum>::size()>;
+	constexpr std::size_t size = NS_DETAIL::enum_size<Enum>();
+	using Idx = std::make_index_sequence<size>;
 	return (std::size_t)NS_DETAIL::valid_value_count<Enum>(Idx{});
 }
 

@@ -28,7 +28,7 @@ enum class HttpStatus
 // By specializing this template class, you can specify the max value of enums
 template<>
 struct Reflect::Enums::ReflectConfig<HttpStatus>
-	: Reflect::Enums::Config<(std::size_t)HttpStatus::NotFound> {};
+	: Reflect::Enums::ConfigBase<(std::size_t)HttpStatus::NotFound> {};
 // Inheritance of Reflect::Enums::Config class is not needed,
 // just make sure specialized ReflectConfig class has required static members.
 
