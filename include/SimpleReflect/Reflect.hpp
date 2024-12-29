@@ -234,6 +234,9 @@ void visit_member(Cls* ptr, const String& name, Func&& visitor)
 
 NAMESPACE_END(NS_REFLECT)
 
+#if defined(_MSVC_TRADITIONAL) && _MSVC_TRADITIONAL
+#error "MSVC won't expand macros properly without /Zc:preprocessor flag"
+#endif
 
 #define REFLECT_DEFINE_IMPL_0()    \
 	template<typename FuncT>       \
