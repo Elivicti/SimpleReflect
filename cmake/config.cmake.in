@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+if (MSVC)
+	# for msvc, this flag is required, otherwise macros won't expand correctly
+	add_compile_options(/Zc:preprocessor)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/SimpleReflectTargets.cmake")
