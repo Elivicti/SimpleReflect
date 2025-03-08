@@ -90,7 +90,7 @@ struct GetReflectorTypeHelper<Cls> {
 };
 
 template<typename Cls>
-using ReflectorType = GetReflectorTypeHelper<Cls>::type;
+using ReflectorType = GetReflectorTypeHelper<std::remove_cvref_t<Cls>>::type;
 
 template<typename Cls>
 	requires requires {
