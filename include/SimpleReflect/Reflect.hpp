@@ -231,6 +231,34 @@ void visit_member(Cls* ptr, const String& name, Func&& visitor)
 	);
 }
 
+NAMESPACE_BEGIN(NS_DETAIL)
+template<typename Cls, template<class> class Container, std::size_t ...Indices>
+constexpr Container<Reflect::String> member_names_impl(std::index_sequence<Indices...>)
+{
+	constexpr auto extract_name = [](const auto& tuple) {
+		return tuple.name;
+	};
+	return { extract_name(std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple))... };
+}
+NAMESPACE_END(NS_DETAIL)
+
+template<typename Cls, template<class> class Container>
+constexpr Container<String> member_names()
+{
+	using TupleIndex = std::make_index_sequence<
+		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+	>;
+	return NS_DETAIL::member_names_impl<Cls, Container>(TupleIndex{});
+}
+
+template<template<class> class Container, typename Cls>
+constexpr Container<String> member_names(Cls* ptr)
+{ return member_names<Cls, Container>(); }
+
+template<template<class> class Container, typename Cls>
+constexpr Container<String> member_names(Cls& ptr)
+{ return member_names<Cls, Container>(); }
+
 
 NAMESPACE_END(NS_REFLECT)
 

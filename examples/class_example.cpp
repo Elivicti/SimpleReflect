@@ -167,6 +167,12 @@ int main()
 			std::invoke(func_int, ptr, 123456);
 		}
 	);
+	::print("------------------\n");
+	for (const Reflect::String& name : Reflect::member_names<std::vector>(y))
+	{
+		::print("{}, ", name);
+	}
+	::print("\b\b \n");
 
 	return 0;
 }
