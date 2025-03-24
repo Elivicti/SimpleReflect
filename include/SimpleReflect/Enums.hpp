@@ -4,7 +4,6 @@
 #include "Defines.hpp"
 
 #include <array>
-#include <cstdint>
 #include <algorithm>
 
 #ifndef NS_ENUMS
