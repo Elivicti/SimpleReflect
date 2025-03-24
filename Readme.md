@@ -31,7 +31,7 @@ public:
 
 You can use `REFLECT_MEMBER(var)` or `REFLECT_MEMBER(name, var)` to declare class members that need to be reflected.
 
-> The following examples assume a function similar to `std::print` in C++23 called `print` is defined. 
+> The following examples assume a function similar to `std::print` in C++23 called `print` is defined.
 
 Member functions are also supported:
 
@@ -40,10 +40,10 @@ struct MyClass
 {
     int a;
     double b;
-    
+
     void func()
     { ::print("this = {}\n", (void*)this); }
-    
+
     REFLECT_DEFINE(MyClass) {
         REFLECT_MEMBER(a),
         REFLECT_MEMBER(b),
@@ -59,18 +59,18 @@ struct MyClass
 {
     int a;
     double b;
-    
+
     void func()
     { ::print("this = {}\n", (void*)this); }
 
     void func(int a)
     { ::print("this = {} with param {}\n", (void*)this, a); }
-    
+
     REFLECT_DEFINE(MyClass) {
         REFLECT_MEMBER(a),
         REFLECT_MEMBER(b),
-        REFLECT_METHOD<void(void)>("func", &MyClass::func),
-        REFLECT_METHOD<void(int)>("func_int", &MyClass::func)
+        REFLECT_METHOD<void(void), "func">(&MyClass::func),
+        REFLECT_METHOD<void(int),  "func_int">(&MyClass::func)
     };
 };
 ```
@@ -84,8 +84,8 @@ REFLECT_DEFINE_GLOBAL(MyClass) {
     REFLECT_DEFINE() {
         REFLECT_MEMBER(a),
         REFLECT_MEMBER(b),
-        REFLECT_METHOD<void(void)>("func", &MyClass::func),
-        REFLECT_METHOD<void(int)>("func_int", &MyClass::func)
+        REFLECT_METHOD<void(void), "func">(&MyClass::func),
+        REFLECT_METHOD<void(int),  "func_int">(&MyClass::func)
     };
 }
 ```

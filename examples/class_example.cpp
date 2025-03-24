@@ -76,8 +76,8 @@ REFLECT_DEFINE_GLOBAL(Y) {
 		REFLECT_MEMBER("a", a),
 		REFLECT_MEMBER("bbb", bbb),
 		REFLECT_MEMBER("b", b),
-		REFLECT_METHOD<void(void)>("func", &Y::func),	// reflect overloaded functions
-		REFLECT_METHOD<void(int)>("func_int", &ThisClass::func) // you can use "ThisClass" to
+		REFLECT_METHOD<void(void), "func">(&Y::func),	// reflect overloaded functions
+		REFLECT_METHOD<void(int), "func_int">(&ThisClass::func) // you can use "ThisClass" to
 		                                                        // reference reflected class
 		                                                        // in case class name is too long
 	};
@@ -93,14 +93,14 @@ struct print_member
 	int indent = 0;
 
 	template<typename Cls, typename Member>
-	void operator()(Cls* ptr, const std::string& name, Member& mbr)
+	void operator()(Cls* ptr, std::string_view name, Member& mbr)
 	{
 		for (int i = 1; i < indent; i++)
 			::print("    ");
 		if (indent > 0)
 			::print("  - ");
 
-		if constexpr (Reflect::is_reflectable<Member>)
+		if constexpr (Reflect::is_reflectable_v<Member>)
 		{
 			::print("{}: ({})\n", name, Reflect::TypeName<Member>);
 			Reflect::for_each_member(&mbr, print_member{ indent + 1 });
@@ -157,18 +157,25 @@ int main()
 	Reflect::for_each_member(&x, print_member{});
 
 	::print("\n");
-	
+
 	::print("--- Displaying members of y:\n");
 	Reflect::for_each_member(&y, print_member{});
 
 	::print("------------------\n");
+	// runtime version
 	Reflect::visit_member(&y, "func_int",
-		[](decltype(y)* ptr, Reflect::MemberFunctionPointer<Y, void(int)>& func_int) {
+		[](decltype(y)* ptr, Reflect::member_function_pointer_t<Y, void(int)>& func_int) {
+			std::invoke(func_int, ptr, 123456);
+		}
+	);
+	// static version
+	Reflect::visit_member<"func_int">(&y,
+		[](decltype(y)* ptr, Reflect::member_function_pointer_t<Y, void(int)>& func_int) {
 			std::invoke(func_int, ptr, 123456);
 		}
 	);
 	::print("------------------\n");
-	for (const Reflect::String& name : Reflect::member_names<std::vector>(y))
+	for (Reflect::StringView name : Reflect::member_names<std::vector>(y))
 	{
 		::print("{}, ", name);
 	}
