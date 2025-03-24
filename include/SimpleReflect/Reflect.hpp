@@ -3,111 +3,103 @@
 
 #include <tuple>
 #include <functional>
+
 #include "Defines.hpp"
+#include "TypeTraits.hpp"
+
+#define MEMBER_TYPE_INFO_TUPLE MEMBER_TYPE_INFO_TUPLE_
 
 NAMESPACE_BEGIN(NS_REFLECT)
 
-template <typename T, template <typename...> typename Template>
-struct is_specialization : std::false_type {};
-
-template <template <typename...> typename Template, typename... Args>
-struct is_specialization<Template<Args...>, Template> : std::true_type {};
-
-template<typename MemberPtr>
-struct MemberPointerTypeInfo;
-
-template<typename Cls, typename T>
-struct MemberPointerTypeInfo<T Cls::*>
-{
-	using ClassType = Cls;
-	using MemberType = T;
-};
-
-template<typename Cls, typename MemberPtr>
-concept is_member_pointer_of = std::is_same_v<
-	std::remove_cvref_t<Cls>,
-	std::remove_cvref_t<typename MemberPointerTypeInfo<MemberPtr>::ClassType>
->;
-
 NAMESPACE_BEGIN(NS_DETAIL)
 
-template<typename Tp>
-	requires std::is_member_pointer_v<Tp>
-struct ReflectMemberInfo
+//////////////////////////////////////////////////////////////
+
+// This class holds the actual class member pointer and it's name.
+template<StaticString Name, typename MemberPointer>
+	requires std::is_member_pointer_v<MemberPointer>
+struct MemberTypeInfo
 {
-	String name;
-	Tp member_ptr;
+	constexpr static bool is_function_pointer = std::is_member_function_pointer_v<MemberPointer>;
+	constexpr static bool is_object_pointer   = std::is_member_object_pointer_v  <MemberPointer>;
+
+	using class_type  = NS_DETAIL::MemberPointerClass<MemberPointer>;
+	using member_type = NS_DETAIL::MemberPointerType <MemberPointer>;
+
+	using member_ref  = std::add_lvalue_reference_t<member_type>;
+
+	using char_type = typename decltype(Name)::value_type;
+	using string_view_type = std::basic_string_view<char_type>;
+
+	constexpr static string_view_type name = Name;
+	MemberPointer member;
 
 	template<typename Cls>
-	auto& unwrap_member_pointer(Cls* ptr)
+	auto& to_real_variable(Cls* ptr)
 	{
-		if constexpr (std::is_member_function_pointer_v<Tp>)
-			return member_ptr;
+		if constexpr (std::is_member_function_pointer_v<MemberPointer>)
+			return member;
 		else
-			return ptr->*member_ptr;
+			return ptr->*member;
 	}
 };
 
-template<typename MemberPtr>
-struct ReflectMemberTypeHelper
-{ using type = void; };
-
-template<typename MemberPtr>
-	requires std::is_member_object_pointer_v<MemberPtr>
-struct ReflectMemberTypeHelper<MemberPtr> {
-	using type = typename MemberPointerTypeInfo<MemberPtr>::MemberType;
-};
-template<typename MemberPtr>
-	requires std::is_member_function_pointer_v<MemberPtr>
-struct ReflectMemberTypeHelper<MemberPtr> {
-	using type = MemberPtr;
-};
-
-template<typename MemberPtr>
-using ReflectMemberType = ReflectMemberTypeHelper<MemberPtr>::type;
-template<typename MemberPtr>
-using ReflectMemberTypeRef = std::add_lvalue_reference_t<ReflectMemberType<MemberPtr>>;
+// This class is the MEMBER_TYPE_INFO_TUPLE wrapper in global.
+// It holds the MEMBER_TYPE_INFO_TUPLE for Cls.
+template<typename Cls>
+	requires (!requires { Cls::MEMBER_TYPE_INFO_TUPLE; })
+struct GlobalMemberInfoTupleWrapper;
 
 template<typename Cls>
-	requires (!requires { Cls::__member_ptr_tuple; })
-struct GlobalMemberPtrTupleWrapper;
-template<typename Cls>
-struct GlobalMemberPtrTupleWrapperBase {
+struct GlobalMemberInfoTupleWrapperBase {
 	using ThisClass = Cls;
 };
 
+//////////////////////////////////////////////////////////////
+
+// Get type that actually holds MEMBER_TYPE_INFO_TUPLE.
+// It's either the Cls itself, or GlobalMemberInfoTupleWrapper<Cls>.
 template<typename Cls>
-struct GetReflectorTypeHelper
-{ using type = void; };
+struct MemberInfoWrapper {
+	using type = void;
+};
 
 template<typename Cls>
 	requires requires {
-		Cls::__member_ptr_tuple;
-		is_specialization<decltype(Cls::__member_ptr_tuple), std::tuple>::value;
+		Cls::MEMBER_TYPE_INFO_TUPLE;
+		is_specialization<decltype(Cls::MEMBER_TYPE_INFO_TUPLE), std::tuple>::value;
 	}
-struct GetReflectorTypeHelper<Cls> {
+struct MemberInfoWrapper<Cls> {
 	using type = Cls;
 };
-
-template<typename Cls>
-using ReflectorType = GetReflectorTypeHelper<std::remove_cvref_t<Cls>>::type;
-
 template<typename Cls>
 	requires requires {
-		GlobalMemberPtrTupleWrapper<Cls>::__member_ptr_tuple;
-		is_specialization<decltype(GlobalMemberPtrTupleWrapper<Cls>::__member_ptr_tuple), std::tuple>::value;
+		GlobalMemberInfoTupleWrapper<Cls>::MEMBER_TYPE_INFO_TUPLE;
+		is_specialization<
+			decltype(GlobalMemberInfoTupleWrapper<Cls>::MEMBER_TYPE_INFO_TUPLE), std::tuple
+		>::value;
 	}
-struct GetReflectorTypeHelper<Cls> {
-	using type = GlobalMemberPtrTupleWrapper<Cls>;
+struct MemberInfoWrapper<Cls> {
+	using type = GlobalMemberInfoTupleWrapper<Cls>;
 };
 
+template<typename Cls>
+using MemberInfoWrapperType = typename MemberInfoWrapper<std::remove_cvref_t<Cls>>::type;
 
+//////////////////////////////////////////////////////////////
+
+// This class is used to create overloaded function pointer
 template<typename T>
 struct Overload;
 
 template<typename Ret, typename ...Args>
 struct Overload<Ret(Args...)>
 {
+	template<typename Cls>
+	constexpr auto operator()(Ret (*ptr)(Args...)) const
+	 	-> decltype(ptr)
+	{ return ptr; }
+
 	template<typename Cls>
 	constexpr auto operator()(Ret (Cls::*ptr)(Args...)) const
 	 	-> decltype(ptr)
@@ -119,63 +111,85 @@ struct Overload<Ret(Args...)>
 	{ return ptr; }
 };
 
-template<typename T>
+
+// This class is used to create overloaded member function pointer reflection
+template<StaticString Name, typename T>
 struct ReflectMethodOverloadImpl;
 
-template<typename Ret, typename ...Args>
-struct ReflectMethodOverloadImpl<Ret(Args...)>
+template<StaticString Name, typename Ret, typename ...Args>
+struct ReflectMethodOverloadImpl<Name, Ret(Args...)>
 {
 	template<typename Cls>
-	constexpr auto operator()(StringView name, Ret (Cls::*ptr)(Args...)) const
-		-> ReflectMemberInfo<decltype(ptr)>
-	{ return ReflectMemberInfo{String{name}, ptr}; }
+	constexpr auto operator()(Ret (Cls::*ptr)(Args...)) const
+		-> MemberTypeInfo<Name, decltype(ptr)>
+	{ return MemberTypeInfo<Name, decltype(ptr)>{ ptr }; }
 
 	template<typename Cls>
-	constexpr auto operator()(StringView name, Ret (Cls::*ptr)(Args...) const) const
-		-> ReflectMemberInfo<decltype(ptr)>
-	{ return ReflectMemberInfo{String{name}, ptr}; }
+	constexpr auto operator()(Ret (Cls::*ptr)(Args...) const) const
+		-> MemberTypeInfo<Name, decltype(ptr)>
+	{ return MemberTypeInfo<Name, decltype(ptr)>{ ptr }; }
 };
 
-template<typename FuncT>
-inline constexpr ReflectMethodOverloadImpl<FuncT> ReflectMethodImpl = {};
+template<typename FuncT, StaticString Name>
+inline constexpr ReflectMethodOverloadImpl<Name, FuncT> ReflectMethodImpl = {};
 
-template<typename Cls, typename FuncT>
-struct MemberFunctionPointerHelper;
-
-template<typename Cls, typename Ret, typename ...Args>
-struct MemberFunctionPointerHelper<Cls, Ret(Args...)>
-{
-	using type = Ret (Cls::*)(Args...);
-};
+//////////////////////////////////////////////////////////////
 
 NAMESPACE_END(NS_DETAIL)
 
 template<typename FuncT>
 inline constexpr NS_DETAIL::Overload<FuncT> Overload = {};
 
+//////////////////////////////////////////////////////////////
+
 template<typename T>
-concept is_reflectable = requires (T t) {
-	NS_DETAIL::ReflectorType<T>::__member_ptr_tuple;
-	is_specialization<decltype(NS_DETAIL::ReflectorType<T>::__member_ptr_tuple), std::tuple>::value;
-};
+struct is_reflectable : std::false_type {};
 
-template<typename Func, typename Cls, typename T>
-concept is_for_each_member_invoker = std::is_invocable_v<
-	Func,
-	Cls*, String, NS_DETAIL::ReflectMemberTypeRef<T>
->;
+template<typename T>
+	requires requires (T t) {
+		NS_DETAIL::MemberInfoWrapperType<T>::MEMBER_TYPE_INFO_TUPLE;
+		is_specialization<decltype(NS_DETAIL::MemberInfoWrapperType<T>::MEMBER_TYPE_INFO_TUPLE), std::tuple>::value;
+	}
+struct is_reflectable<T> : std::true_type {};
 
-template<typename Cls, typename FuncT>
-using MemberFunctionPointer = NS_DETAIL::MemberFunctionPointerHelper<Cls, FuncT>::type;
+template<typename T>
+inline constexpr bool is_reflectable_v = is_reflectable<T>::value;
+
+template<typename T>
+concept reflectable = is_reflectable_v<T>;
+
+//////////////////////////////////////////////////////////////
 
 NAMESPACE_BEGIN(NS_DETAIL)
 
-template<typename Cls, typename Func, typename ...Tp>
-	requires (is_for_each_member_invoker<Func, Cls, Tp> && ...)
-void for_each_member_impl_expand(Cls* ptr, Func&& func, NS_DETAIL::ReflectMemberInfo<Tp>& ...pair)
+NAMESPACE_END(NS_DETAIL)
+
+template<typename Func, typename Cls, typename MemberInfo>
+struct is_for_each_member_invokable : std::false_type {};
+
+template<typename Func, typename Cls, typename MemberInfo>
+	requires std::is_invocable_v<
+		Func,
+		Cls*, typename MemberInfo::string_view_type, typename MemberInfo::member_ref
+	>
+struct is_for_each_member_invokable<Func, Cls, MemberInfo> : std::true_type {};
+
+template<typename Func, typename Cls, typename T>
+inline constexpr bool is_for_each_member_invokable_v = is_for_each_member_invokable<Func, Cls, T>::value;
+
+template<typename Func, typename Cls, typename T>
+concept for_each_member_invokable = is_for_each_member_invokable_v<Func, Cls, T>;
+
+//////////////////////////////////////////////////////////////
+
+NAMESPACE_BEGIN(NS_DETAIL)
+
+template<typename Cls, typename Func, typename ...MemberInfoT>
+	requires (for_each_member_invokable<Func, Cls, MemberInfoT> && ...)
+void for_each_member_impl_expand(Cls* ptr, Func&& func, MemberInfoT& ...pair)
 {
 	(std::invoke(
-		std::forward<Func>(func), ptr, pair.name, pair.unwrap_member_pointer(ptr)),
+		std::forward<Func>(func), ptr, pair.name, pair.to_real_variable(ptr)),
 		...
 	);
 }
@@ -185,7 +199,7 @@ void for_each_member_impl(Cls* ptr, Func&& func, std::index_sequence<Indices...>
 {
 	for_each_member_impl_expand(
 		ptr, std::forward<Func>(func),
-		std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple)...
+		std::get<Indices>(MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)...
 	);
 }
 
@@ -193,38 +207,58 @@ template<typename Cls, typename Func, std::size_t ...Indices>
 void visit_member_impl(Func&& func, std::index_sequence<Indices...>)
 {
 	(std::invoke(
-		std::forward<Func>(func), std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple)),
+		std::forward<Func>(func), std::get<Indices>(MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)),
 		...
 	);
 }
 
 NAMESPACE_END(NS_DETAIL)
 
-template<typename Cls, typename Func>
-	requires is_reflectable<Cls>
-void for_each_member(Cls* ptr, Func&& func)
+template<reflectable Cls, typename Func>
+constexpr void for_each_member(Cls* ptr, Func&& func)
 {
 	using TupleIndex = std::make_index_sequence<
-		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+		std::tuple_size_v<decltype(NS_DETAIL::MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)>
 	>;
 	NS_DETAIL::for_each_member_impl(ptr, std::forward<Func>(func), TupleIndex{});
 }
 
-template<typename Cls, typename Func>
-	requires is_reflectable<Cls>
-void visit_member(Cls* ptr, const String& name, Func&& visitor)
+
+// Because function parameters are always considered runtime variable, Func will be instantiate for all member(type)s
+// that it can be invoked,  but is only invoked when name is equal.
+// If no member in Cls with specified name exists, this function does nothing (and will not cause compile error).
+template<reflectable Cls, typename Func, typename StringT>
+constexpr void visit_member(Cls* ptr, const StringT& name, Func&& visitor)
 {
 	using TupleIndex = std::make_index_sequence<
-		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+		std::tuple_size_v<decltype(NS_DETAIL::MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)>
 	>;
 	NS_DETAIL::visit_member_impl<Cls>(
 		[&name, visitor, ptr](auto& pair) {
-			using MemberType = std::decay_t<decltype(pair.unwrap_member_pointer(ptr))>;
+			using MemberType = std::decay_t<decltype(pair.to_real_variable(ptr))>;
 			if constexpr (std::is_invocable_v<Func, Cls*, MemberType&>)
 			{
 				if (pair.name != name)
 					return;
-				visitor(ptr, pair.unwrap_member_pointer(ptr));
+				visitor(ptr, pair.to_real_variable(ptr));
+			}
+		},
+		TupleIndex{}
+	);
+}
+// This is the static version of `visit_member`, Func will only be instantiate for member with
+// specified name.
+// If no member in Cls with specified name exists, this function does nothing (and will not cause compile error).
+template<StaticString Name, reflectable Cls, typename Func>
+constexpr void visit_member(Cls* ptr, Func&& visitor)
+{
+	using TupleIndex = std::make_index_sequence<
+		std::tuple_size_v<decltype(NS_DETAIL::MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)>
+	>;
+	NS_DETAIL::visit_member_impl<Cls>(
+		[visitor, ptr](auto& pair) {
+			if constexpr (pair.name == Name) {
+				visitor(ptr, pair.to_real_variable(ptr));
 			}
 		},
 		TupleIndex{}
@@ -232,32 +266,40 @@ void visit_member(Cls* ptr, const String& name, Func&& visitor)
 }
 
 NAMESPACE_BEGIN(NS_DETAIL)
-template<typename Cls, template<class> class Container, std::size_t ...Indices>
-constexpr Container<Reflect::String> member_names_impl(std::index_sequence<Indices...>)
+template<typename Cls, typename Container, std::size_t ...Indices>
+constexpr Container member_names_impl(std::index_sequence<Indices...>)
 {
 	constexpr auto extract_name = [](const auto& tuple) {
-		return tuple.name;
+		return typename Container::value_type{ tuple.name };
 	};
-	return { extract_name(std::get<Indices>(ReflectorType<Cls>::__member_ptr_tuple))... };
+	return { extract_name(std::get<Indices>(MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE))... };
 }
 NAMESPACE_END(NS_DETAIL)
 
-template<typename Cls, template<class> class Container>
-constexpr Container<String> member_names()
+template<typename Cls, typename Container>
+constexpr Container member_names()
 {
 	using TupleIndex = std::make_index_sequence<
-		std::tuple_size_v<decltype(NS_DETAIL::ReflectorType<Cls>::__member_ptr_tuple)>
+		std::tuple_size_v<decltype(NS_DETAIL::MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)>
 	>;
 	return NS_DETAIL::member_names_impl<Cls, Container>(TupleIndex{});
 }
 
-template<template<class> class Container, typename Cls>
-constexpr Container<String> member_names(Cls* ptr)
+template<typename Container, typename Cls>
+constexpr Container member_names([[maybe_unused]] Cls* ptr)
+{ return member_names<Cls, Container>(); }
+
+template<typename Container, typename Cls>
+constexpr Container member_names([[maybe_unused]] Cls& ptr)
 { return member_names<Cls, Container>(); }
 
 template<template<class> class Container, typename Cls>
-constexpr Container<String> member_names(Cls& ptr)
-{ return member_names<Cls, Container>(); }
+constexpr Container<StringView> member_names([[maybe_unused]] Cls* ptr)
+{ return member_names<Cls, Container<StringView>>(); }
+
+template<template<class> class Container, typename Cls>
+constexpr Container<StringView> member_names([[maybe_unused]] Cls& ptr)
+{ return member_names<Cls, Container<StringView>>(); }
 
 
 NAMESPACE_END(NS_REFLECT)
@@ -267,10 +309,10 @@ NAMESPACE_END(NS_REFLECT)
 #endif
 
 #define REFLECT_DEFINE_IMPL_0()    \
-	template<typename FuncT>       \
-	static inline const constexpr NS_REFLECT::NS_DETAIL::ReflectMethodOverloadImpl<FuncT>& \
-		REFLECT_METHOD = NS_REFLECT::NS_DETAIL::ReflectMethodImpl<FuncT>;  \
-	static inline auto __member_ptr_tuple = std::tuple
+	template<typename FuncT, NS_REFLECT::StaticString Name>       \
+	static inline const constexpr auto& \
+		REFLECT_METHOD = NS_REFLECT::NS_DETAIL::ReflectMethodImpl<FuncT, Name>;  \
+	static inline auto MEMBER_TYPE_INFO_TUPLE = std::tuple
 #define REFLECT_DEFINE_IMPL_1(cls) \
 	using ThisClass = cls; REFLECT_DEFINE_IMPL_0()
 #define REFLECT_DEFINE_IMPL_GET(_0, _1, NAME, ...) NAME
@@ -280,7 +322,9 @@ NAMESPACE_END(NS_REFLECT)
 	REFLECT_DEFINE_IMPL_GET(_0 __VA_OPT__(,) __VA_ARGS__, REFLECT_DEFINE_IMPL_1, REFLECT_DEFINE_IMPL_0)(__VA_ARGS__)
 
 
-#define REFLECT_MEMBER_IMPL_2(name, member) NS_REFLECT::NS_DETAIL::ReflectMemberInfo{ name, &ThisClass::member }
+#define REFLECT_MEMBER_IMPL_2(name, member) \
+	NS_REFLECT::NS_DETAIL::MemberTypeInfo<name, decltype(&ThisClass::member)>{ &ThisClass::member }
+	// NS_REFLECT::NS_DETAIL::MemberTypeInfo<name, decltype(&ThisClass::member)>{ &ThisClass::member }
 #ifdef USE_WCHAR
 #define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(_L(#member), member)
 #else
@@ -294,8 +338,8 @@ NAMESPACE_END(NS_REFLECT)
 
 // use __VA_ARGS__ to handle templates, like: std::map<int, int>
 #define REFLECT_DEFINE_GLOBAL(...)    \
-	template<> struct NS_REFLECT::NS_DETAIL::GlobalMemberPtrTupleWrapper<__VA_ARGS__> \
-		: NS_REFLECT::NS_DETAIL::GlobalMemberPtrTupleWrapperBase<__VA_ARGS__>
+	template<> struct NS_REFLECT::NS_DETAIL::GlobalMemberInfoTupleWrapper<__VA_ARGS__> \
+		: NS_REFLECT::NS_DETAIL::GlobalMemberInfoTupleWrapperBase<__VA_ARGS__>
 
 
 #endif //! __SIMPLE_REFLECT_HEADER__

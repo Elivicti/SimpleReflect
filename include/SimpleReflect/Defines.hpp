@@ -2,7 +2,7 @@
 #define __SIMPLE_REFLECT_DEFINES_HEADER__
 
 #include <string>
-#include <type_traits>
+#include <algorithm>
 #include <source_location>
 
 #ifndef NAMESPACE_BEGIN
@@ -46,7 +46,6 @@ using String = std::string;
 using StringView = std::string_view;
 #endif
 
-
 template<
 	std::size_t N,
 #ifdef USE_WCHAR
@@ -57,6 +56,8 @@ template<
 >
 struct StaticString
 {
+	using value_type = CharT;
+
 	constexpr StaticString() noexcept
 		: content{ 0 } {}
 
@@ -65,8 +66,12 @@ struct StaticString
 	{
 		auto begin = sv.begin();
 		auto size = N <= sv.size() ? N : sv.size();
-		std::copy(begin, begin + size, content);
+		std::ranges::copy(begin, begin + size, content);
 	}
+	constexpr StaticString(const CharT (&str)[N + 1])
+    {
+        std::ranges::copy_n(str, N + 1, content);
+    }
 
 	constexpr operator std::basic_string_view<CharT>() const noexcept
 	{
@@ -75,20 +80,27 @@ struct StaticString
 
 	constexpr CharT* data() noexcept { return content; }
 	constexpr const CharT* data() const noexcept { return content; }
+	consteval std::size_t size() const noexcept { return N; }
 
-private:
 	CharT content[N + 1];
 
-public:
 	template<std::size_t Len>
 	constexpr StaticString<N + Len, CharT> operator+(const StaticString<Len, CharT>& str) const
 	{
 		StaticString<N + Len, CharT> ret;
-		std::copy(content, content + N, ret.data());
-		std::copy(str.data(), str.data() + Len, ret.data() + N + 1);
+		std::ranges::copy(content, content + N, ret.data());
+		std::ranges::copy(str.data(), str.data() + Len, ret.data() + N + 1);
 		return ret;
 	}
+
+	template<typename StringT>
+	constexpr auto operator<=>(const StringT& other) const
+	{
+		return std::basic_string_view<CharT>{ content } <=> other;
+	}
 };
+template<std::size_t N, typename CharT = char>
+StaticString(const CharT(&)[N]) -> StaticString<N - 1ull, CharT>;
 
 NAMESPACE_BEGIN(NS_DETAIL)
 
