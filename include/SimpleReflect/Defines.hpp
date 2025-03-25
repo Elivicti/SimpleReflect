@@ -46,14 +46,7 @@ using String = std::string;
 using StringView = std::string_view;
 #endif
 
-template<
-	std::size_t N,
-#ifdef USE_WCHAR
-	typename CharT = wchar_t
-#else
-	typename CharT = char
-#endif
->
+template<std::size_t N, typename CharT = String::value_type>
 struct StaticString
 {
 	using value_type = CharT;
