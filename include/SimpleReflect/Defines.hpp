@@ -81,6 +81,7 @@ struct StaticString
 	constexpr CharT* data() noexcept { return content; }
 	constexpr const CharT* data() const noexcept { return content; }
 	consteval std::size_t size() const noexcept { return N; }
+	consteval std::size_t length() const noexcept { return N; }
 
 	CharT content[N + 1];
 
@@ -105,9 +106,9 @@ StaticString(const CharT(&)[N]) -> StaticString<N - 1ull, CharT>;
 NAMESPACE_BEGIN(NS_DETAIL)
 
 template<typename T>
-inline constexpr std::string_view type_name() noexcept;
+inline constexpr std::string_view type_name_impl() noexcept;
 
-template<> inline constexpr std::string_view type_name<void>() noexcept
+template<> inline constexpr std::string_view type_name_impl<void>() noexcept
 { return "void"; }
 
 template<typename T>
@@ -115,17 +116,17 @@ inline constexpr std::string_view wrapped_type_name() noexcept
 { return std::source_location::current().function_name(); }
 
 inline constexpr std::size_t wrapped_type_name_prefix_length() noexcept
-{ return wrapped_type_name<void>().find(type_name<void>()); }
+{ return wrapped_type_name<void>().find(type_name_impl<void>()); }
 
 constexpr std::size_t wrapped_type_name_suffix_length() noexcept
 {
 	return wrapped_type_name<void>().length()
 	     - wrapped_type_name_prefix_length()
-	     - type_name<void>().length();
+	     - type_name_impl<void>().length();
 }
 
 template<typename T>
-inline constexpr std::string_view type_name() noexcept
+inline constexpr std::string_view type_name_impl() noexcept
 {
 	constexpr auto wrapped_name = wrapped_type_name<T>();
 	constexpr auto prefix_length = wrapped_type_name_prefix_length();
@@ -136,7 +137,14 @@ inline constexpr std::string_view type_name() noexcept
 NAMESPACE_END(NS_DETAIL)
 
 template<typename T>
-inline constexpr auto TypeName = NS_DETAIL::type_name<T>();
+struct type_name
+{
+	inline static constexpr const auto raw_sv = NS_DETAIL::type_name_impl<T>();
+	inline static constexpr const StaticString<raw_sv.size(), char> value{ raw_sv };
+};
+
+template<typename T>
+inline constexpr auto type_name_v = type_name<T>::value;
 
 NAMESPACE_END(NS_REFLECT)
 

@@ -64,7 +64,7 @@ inline constexpr std::size_t wrapped_enum_value_name_prefix_length() noexcept
     constexpr auto prefix_len = wrapped_enum_value_name<EnumNameHelper, EnumNameHelper::VOID>()
             .find(enum_value_name<EnumNameHelper, EnumNameHelper::VOID>());
     constexpr auto real_prefix_len = prefix_len
-        - (TypeName<EnumNameHelper>.length() - TypeName<Enum>.length());
+        - (type_name_v<EnumNameHelper>.length() - type_name_v<Enum>.length());
 	return real_prefix_len;
 }
 inline constexpr std::size_t wrapped_enum_value_name_suffix_length() noexcept
