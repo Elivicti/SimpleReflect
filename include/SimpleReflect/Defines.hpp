@@ -54,17 +54,17 @@ struct StaticString
 	constexpr StaticString() noexcept
 		: content{ 0 } {}
 
-	constexpr StaticString(std::basic_string_view<CharT> sv) noexcept
+	explicit constexpr StaticString(std::basic_string_view<CharT> sv) noexcept
 		: content{ 0 }
 	{
 		auto begin = sv.begin();
 		auto size = N <= sv.size() ? N : sv.size();
 		std::ranges::copy(begin, begin + size, content);
 	}
-	constexpr StaticString(const CharT (&str)[N + 1])
-    {
-        std::ranges::copy_n(str, N + 1, content);
-    }
+	constexpr StaticString(const CharT(& str)[N + 1])
+	{
+		std::ranges::copy_n(str, N + 1, content);
+	}
 
 	constexpr operator std::basic_string_view<CharT>() const noexcept
 	{
@@ -87,10 +87,22 @@ struct StaticString
 		return ret;
 	}
 
+	template<std::size_t M>
+	constexpr bool operator==(const StaticString<M, CharT>& other) const noexcept
+	{
+		return std::basic_string_view<CharT>{ *this }
+			== std::basic_string_view<CharT>{ other };
+	}
+	template<std::size_t M>
+	constexpr bool operator==(const CharT(& other)[M]) const noexcept
+	{
+		return std::basic_string_view<CharT>{ *this }
+			== std::basic_string_view<CharT>{ other, M - 1 };
+	}
 	template<typename StringT>
 	constexpr auto operator<=>(const StringT& other) const
 	{
-		return std::basic_string_view<CharT>{ content } <=> other;
+		return std::basic_string_view<CharT>{ *this } <=> other;
 	}
 };
 template<std::size_t N, typename CharT = char>
@@ -114,8 +126,8 @@ inline constexpr std::size_t wrapped_type_name_prefix_length() noexcept
 constexpr std::size_t wrapped_type_name_suffix_length() noexcept
 {
 	return wrapped_type_name<void>().length()
-	     - wrapped_type_name_prefix_length()
-	     - type_name_impl<void>().length();
+		 - wrapped_type_name_prefix_length()
+		 - type_name_impl<void>().length();
 }
 
 template<typename T>
