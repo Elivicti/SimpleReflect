@@ -164,34 +164,41 @@ NAMESPACE_BEGIN(NS_DETAIL)
 
 NAMESPACE_END(NS_DETAIL)
 
-template<typename Func, typename Cls, typename MemberInfo>
+template<typename Func, typename Cls, typename MemberT, typename StringT = StringView>
 struct is_for_each_member_invokable : std::false_type {};
 
-template<typename Func, typename Cls, typename MemberInfo>
+template<typename Func, typename Cls, typename MemberT, typename StringT>
 	requires std::is_invocable_v<
 		Func,
-		Cls*, typename MemberInfo::string_view_type, typename MemberInfo::member_ref
+		Cls*, StringT, std::remove_reference_t<MemberT>&
 	>
-struct is_for_each_member_invokable<Func, Cls, MemberInfo> : std::true_type {};
+struct is_for_each_member_invokable<Func, Cls, MemberT, StringT> : std::true_type {};
 
-template<typename Func, typename Cls, typename T>
-inline constexpr bool is_for_each_member_invokable_v = is_for_each_member_invokable<Func, Cls, T>::value;
+template<typename Func, typename Cls, typename MemberT, typename StringT = StringView>
+inline constexpr bool is_for_each_member_invokable_v =
+	is_for_each_member_invokable<Func, Cls, MemberT, StringT>::value;
 
-template<typename Func, typename Cls, typename T>
-concept for_each_member_invokable = is_for_each_member_invokable_v<Func, Cls, T>;
+template<typename Func, typename Cls, typename MemberT, typename StringT = StringView>
+concept for_each_member_invokable =
+	is_for_each_member_invokable_v<Func, Cls, StringT, MemberT>;
 
 //////////////////////////////////////////////////////////////
 
 NAMESPACE_BEGIN(NS_DETAIL)
 
+template<typename Func, typename Cls, typename MemberInfo>
+inline constexpr bool member_type_info_invokable = is_for_each_member_invokable<
+	Func, Cls,
+	typename MemberInfo::member_type, typename MemberInfo::string_view_type
+>::value;
+
 template<typename Cls, typename Func, typename ...MemberInfoT>
-	requires (for_each_member_invokable<Func, Cls, MemberInfoT> && ...)
+	requires (member_type_info_invokable<Func, Cls, MemberInfoT> && ...)
 void for_each_member_impl_expand(Cls* ptr, Func&& func, MemberInfoT& ...pair)
 {
 	(std::invoke(
-		std::forward<Func>(func), ptr, pair.name, pair.to_real_variable(ptr)),
-		...
-	);
+		std::forward<Func>(func), ptr, pair.name, pair.to_real_variable(ptr)
+	), ...);
 }
 
 template<typename Cls, typename Func, std::size_t ...Indices>
