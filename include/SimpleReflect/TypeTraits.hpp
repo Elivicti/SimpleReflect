@@ -57,11 +57,13 @@ template<typename Cls, typename Ret, typename ...Args>
 struct member_function_pointer<Cls, Ret(Args...)>
 {
 	using type = Ret (Cls::*)(Args...);
+	using const_type = type const;
 };
 
 template<typename Cls, typename FuncT>
 using member_function_pointer_t = typename member_function_pointer<Cls, FuncT>::type;
-
+template<typename Cls, typename FuncT>
+using const_member_function_pointer_t = typename member_function_pointer<Cls, FuncT>::const_type;
 
 NAMESPACE_END(NS_REFLECT)
 
