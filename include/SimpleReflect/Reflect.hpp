@@ -95,7 +95,6 @@ struct Overload;
 template<typename Ret, typename ...Args>
 struct Overload<Ret(Args...)>
 {
-	template<typename Cls>
 	constexpr auto operator()(Ret (*ptr)(Args...)) const
 	 	-> decltype(ptr)
 	{ return ptr; }
@@ -138,7 +137,7 @@ inline constexpr ReflectMethodOverloadImpl<Name, FuncT> ReflectMethodImpl = {};
 NAMESPACE_END(NS_DETAIL)
 
 template<typename FuncT>
-inline constexpr NS_DETAIL::Overload<FuncT> Overload = {};
+inline constexpr NS_DETAIL::Overload<FuncT> overload = {};
 
 //////////////////////////////////////////////////////////////
 
