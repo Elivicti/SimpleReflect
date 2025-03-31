@@ -102,22 +102,22 @@ struct print_member
 
 		if constexpr (Reflect::is_reflectable_v<Member>)
 		{
-			::print("{}: ({})\n", name, std::string_view{ Reflect::type_name_v<Member> });
+			::print("{}: ({})\n", name, Reflect::type_name_v<Member>);
 			Reflect::for_each_member(&mbr, print_member{ indent + 1 });
 		}
 		else if constexpr (std::is_invocable_v<Member, Cls*>)
 		{
-			::print("{}: {}; ", name, std::string_view{ Reflect::type_name_v<Member> });
+			::print("{}: {}; ", name, Reflect::type_name_v<Member>);
 			std::invoke(mbr, ptr);
 		}
 		else if constexpr (std::is_invocable_v<Member, Cls*, int>)
 		{
-			::print("{}: {}; ", name, std::string_view{ Reflect::type_name_v<Member> });
+			::print("{}: {}; ", name, Reflect::type_name_v<Member>);
 			std::invoke(mbr, ptr, 255);
 		}
 		else if constexpr (std::is_member_function_pointer_v<Member> || !::formattable<Member>)
 		{
-			::print("{}: {}\n", name, std::string_view{ Reflect::type_name_v<Member> });
+			::print("{}: {}\n", name, Reflect::type_name_v<Member>);
 		}
 		else if constexpr (std::is_same_v<Member, std::uint32_t>)
 		{

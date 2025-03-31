@@ -149,7 +149,7 @@ struct type_name
 };
 
 template<typename T>
-inline constexpr auto type_name_v = type_name<T>::value;
+inline constexpr std::string_view type_name_v = type_name<T>::value;
 
 NAMESPACE_END(NS_REFLECT)
 
