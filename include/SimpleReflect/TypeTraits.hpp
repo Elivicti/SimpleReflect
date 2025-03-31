@@ -44,7 +44,7 @@ using MemberPointerType  = typename MemberPointerInfo<MemberPtr>::member_type;
 
 NAMESPACE_END(NS_DETAIL)
 
-template<typename Cls, typename MemberPtr>
+template<typename MemberPtr, typename Cls>
 concept is_member_pointer_of = std::is_same_v<
 	std::remove_cvref_t<Cls>,
 	std::remove_cvref_t<NS_DETAIL::MemberPointerClass<MemberPtr>>
