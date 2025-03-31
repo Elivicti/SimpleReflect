@@ -164,6 +164,9 @@ NAMESPACE_BEGIN(NS_DETAIL)
 
 NAMESPACE_END(NS_DETAIL)
 
+// Type trait class that determine if Func can be invoked as
+// Func(Cls*, StringT, MemberT&).
+// Cls and MemberT can be const.
 template<typename Func, typename Cls, typename MemberT, typename StringT = StringView>
 struct is_for_each_member_invokable : std::false_type {};
 
@@ -214,13 +217,13 @@ template<typename Cls, typename Func, std::size_t ...Indices>
 void visit_member_impl(Func&& func, std::index_sequence<Indices...>)
 {
 	(std::invoke(
-		std::forward<Func>(func), std::get<Indices>(MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)),
-		...
-	);
+		std::forward<Func>(func), std::get<Indices>(MemberInfoWrapperType<Cls>::MEMBER_TYPE_INFO_TUPLE)
+	), ...);
 }
 
 NAMESPACE_END(NS_DETAIL)
 
+// Iterate through all reflect members of Cls, in order of they were declared
 template<reflectable Cls, typename Func>
 constexpr void for_each_member(Cls* ptr, Func&& func)
 {
@@ -232,7 +235,7 @@ constexpr void for_each_member(Cls* ptr, Func&& func)
 
 
 // Because function parameters are always considered runtime variable, Func will be instantiate for all member(type)s
-// that it can be invoked,  but is only invoked when name is equal.
+// that it can be invoked, but is only invoked when name is equal.
 // If no member in Cls with specified name exists, this function does nothing (and will not cause compile error).
 template<reflectable Cls, typename Func, typename StringT>
 constexpr void visit_member(Cls* ptr, const StringT& name, Func&& visitor)
@@ -283,6 +286,8 @@ constexpr Container member_names_impl(std::index_sequence<Indices...>)
 }
 NAMESPACE_END(NS_DETAIL)
 
+// Get all reflected member names from Cls, store them in Container.
+// The name of each member will be cast to typename Container::value_type
 template<typename Cls, typename Container>
 constexpr Container member_names()
 {
@@ -292,18 +297,30 @@ constexpr Container member_names()
 	return NS_DETAIL::member_names_impl<Cls, Container>(TupleIndex{});
 }
 
+// Get all reflected member names from Cls, store them in Container.
+// The name of each member will be cast to typename Container::value_type.
+// A helper function that can deduce Cls from parameter
 template<typename Container, typename Cls>
 constexpr Container member_names([[maybe_unused]] Cls* ptr)
 { return member_names<Cls, Container>(); }
 
+// Get all reflected member names from Cls, store them in Container.
+// The name of each member will be cast to typename Container::value_type.
+// A helper function that can deduce Cls from parameter
 template<typename Container, typename Cls>
 constexpr Container member_names([[maybe_unused]] Cls& ptr)
 { return member_names<Cls, Container>(); }
 
+// Get all reflected member names from Cls, store them in Container.
+// The name of each member will be cast to Reflect::StringView.
+// A helper function that can deduce Cls from parameter
 template<template<class> class Container, typename Cls>
 constexpr Container<StringView> member_names([[maybe_unused]] Cls* ptr)
 { return member_names<Cls, Container<StringView>>(); }
 
+// Get all reflected member names from Cls, store them in Container.
+// The name of each member will be cast to Reflect::StringView.
+// A helper function that can deduce Cls from parameter
 template<template<class> class Container, typename Cls>
 constexpr Container<StringView> member_names([[maybe_unused]] Cls& ptr)
 { return member_names<Cls, Container<StringView>>(); }
@@ -331,7 +348,6 @@ NAMESPACE_END(NS_REFLECT)
 
 #define REFLECT_MEMBER_IMPL_2(name, member) \
 	NS_REFLECT::NS_DETAIL::MemberTypeInfo<name, decltype(&ThisClass::member)>{ &ThisClass::member }
-	// NS_REFLECT::NS_DETAIL::MemberTypeInfo<name, decltype(&ThisClass::member)>{ &ThisClass::member }
 #ifdef USE_WCHAR
 #define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(_L(#member), member)
 #else
