@@ -180,6 +180,8 @@ int main()
 		::print("{}, ", name);
 	}
 	::print("\b\b \n");
+	::print("------------------\n");
+	::print("a = {}\n", Reflect::get_member<"a">(x));
 
 	return 0;
 }
