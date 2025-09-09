@@ -57,7 +57,7 @@ template<typename Cls, typename Ret, typename ...Args>
 struct member_function_pointer<Cls, Ret(Args...)>
 {
 	using type = Ret (Cls::*)(Args...);
-	using const_type = type const;
+	using const_type = Ret (Cls::*)(Args...) const;
 };
 
 template<typename Cls, typename FuncT>
