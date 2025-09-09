@@ -23,8 +23,8 @@
 
 NAMESPACE_BEGIN(NS_REFLECT)
 
-#ifdef _L
-#undef _L
+#ifdef TXT
+#undef TXT
 #endif
 
 #if defined(UNICODE) || defined(_UNICODE) || defined(USE_WCHAR)
@@ -32,15 +32,15 @@ NAMESPACE_BEGIN(NS_REFLECT)
 #define USE_WCHAR 1
 #endif
 
-#define _L_IMPL_R(x) L ## x
-#define _L(x) _L_IMPL_R(x)
+#define TXT_IMPL(x) L ## x
+#define TXT(x) TXT_IMPL(x)
 
 using String = std::wstring;
 using StringView = std::wstring_view;
 #else
 
-#define _L_IMPL_R(x) x
-#define _L(x) x
+#define TXT_IMPL(x) x
+#define TXT(x) x
 
 using String = std::string;
 using StringView = std::string_view;

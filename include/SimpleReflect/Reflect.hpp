@@ -382,7 +382,7 @@ NAMESPACE_END(NS_REFLECT)
 #define REFLECT_MEMBER_IMPL_2(name, member) \
 	NS_REFLECT::NS_DETAIL::MemberTypeInfo<name, decltype(&ThisClass::member)>{ &ThisClass::member }
 #ifdef USE_WCHAR
-#define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(_L(#member), member)
+#define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(TXT(#member), member)
 #else
 #define REFLECT_MEMBER_IMPL_1(member) REFLECT_MEMBER_IMPL_2(#member, member)
 #endif
