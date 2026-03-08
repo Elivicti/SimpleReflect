@@ -104,7 +104,12 @@ constexpr std::size_t valid_value_count(std::index_sequence<I...>)
 }
 
 template<typename Enum, std::size_t... I>
-constexpr auto valid_values(std::index_sequence<I...>)
+#ifdef _MSC_VER
+consteval // somehow msvc won't consider offset as constant expression with constexpr
+#else
+constexpr // gcc and clang won't consider valid as constant expression with consteval
+#endif // what???
+auto valid_values(std::index_sequence<I...>)
 {
 	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, get_enum_value<Enum>(I)>()... };
 	constexpr std::size_t valid_count = std::count_if(valid, valid + sizeof...(I), [](bool v) { return v; });
