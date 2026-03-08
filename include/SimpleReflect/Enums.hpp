@@ -43,15 +43,11 @@ inline constexpr std::string_view enum_value_name() noexcept;
 template<>
 inline constexpr std::string_view enum_value_name<EnumNameHelper, EnumNameHelper::VOID>() noexcept
 {
-#if defined(_MSC_VER)
 #define EXPAND(x) #x
 #define CONCAT_NS_STR(ns1, ns2, ns3, str) EXPAND(ns1) "::" EXPAND(ns2) "::" EXPAND(ns3) "::" str
 	return CONCAT_NS_STR(NS_REFLECT, NS_ENUMS, NS_DETAIL, "EnumNameHelper::VOID");
 #undef EXPAND
 #undef CONCAT_NS_STR
-#else
-	return "EnumNameHelper::VOID";
-#endif
 }
 
 template<typename Enum, Enum V>
