@@ -80,16 +80,17 @@ inline constexpr std::string_view enum_value_name() noexcept
 }
 
 template<typename Enum, Enum V>
-constexpr bool is_valid() noexcept
+consteval bool is_valid() noexcept
 {
 	constexpr std::string_view name{ enum_value_name<Enum, V>() };
-	if (name.find("(") != std::string_view::npos)
+	if constexpr (name.find("(") != std::string_view::npos)
 		return false;
-	return !name.empty();
+	else
+		return !name.empty();
 }
 
 template<typename Enum>
-constexpr auto get_enum_value(std::size_t v)
+consteval Enum get_enum_value(std::size_t v)
 {
 	using Config = ReflectConfig<Enum>;
 	return static_cast<Enum>(Config::min + v);
