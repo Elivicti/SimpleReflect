@@ -76,10 +76,9 @@ REFLECT_DEFINE_GLOBAL(Y) {
 		REFLECT_MEMBER("a", a),
 		REFLECT_MEMBER("bbb", bbb),
 		REFLECT_MEMBER("b", b),
-		REFLECT_METHOD<void(void), "func">(&Y::func),	// reflect overloaded functions
-		REFLECT_METHOD<void(int), "func_int">(&ThisClass::func) // you can use "ThisClass" to
-		                                                        // reference reflected class
-		                                                        // in case class name is too long
+		REFLECT_METHOD<void(void), "func">(&Y::func), // reflect overloaded functions
+		// you can use "ThisClass" to reference reflected class in case class name is too long
+		REFLECT_METHOD<void(int), "func_int">(&ThisClass::func)
 	};
 };
 

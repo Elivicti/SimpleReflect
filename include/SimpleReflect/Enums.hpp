@@ -57,10 +57,9 @@ inline constexpr std::string_view wrapped_enum_value_name() noexcept
 template<typename Enum>
 inline constexpr std::size_t wrapped_enum_value_name_prefix_length() noexcept
 {
-    constexpr auto prefix_len = wrapped_enum_value_name<EnumNameHelper, EnumNameHelper::VOID>()
-            .find(enum_value_name<EnumNameHelper, EnumNameHelper::VOID>());
-    constexpr auto real_prefix_len = prefix_len
-        - (type_name_v<EnumNameHelper>.length() - type_name_v<Enum>.length());
+	constexpr auto prefix_len = wrapped_enum_value_name<EnumNameHelper, EnumNameHelper::VOID>()
+		.find(enum_value_name<EnumNameHelper, EnumNameHelper::VOID>());
+	constexpr auto real_prefix_len = prefix_len - (type_name_v<EnumNameHelper>.length() - type_name_v<Enum>.length());
 	return real_prefix_len;
 }
 inline constexpr std::size_t wrapped_enum_value_name_suffix_length() noexcept
@@ -113,7 +112,7 @@ auto valid_values(std::index_sequence<I...>)
 {
 	constexpr bool valid[sizeof...(I)] = { is_valid<Enum, get_enum_value<Enum>(I)>()... };
 	constexpr std::size_t valid_count = std::count_if(valid, valid + sizeof...(I), [](bool v) { return v; });
-	
+
 	std::array<Enum, valid_count> values{};
 	for(std::size_t offset = 0, n = 0; n < valid_count; ++offset) {
 		if (valid[offset])
@@ -153,9 +152,9 @@ template<typename Enum, std::size_t... I>
 constexpr auto entries_impl(std::index_sequence<I...>) noexcept
 	-> EntryArray<Enum, enum_values_v<Enum>.size()>
 {
-    return EntryArray<Enum, enum_values_v<Enum>.size()>{
+	return EntryArray<Enum, enum_values_v<Enum>.size()>{
 		{{ enum_value_name<Enum, enum_values_v<Enum>[I]>(), enum_values_v<Enum>[I] }...}
-    };
+	};
 }
 
 NAMESPACE_END(NS_DETAIL)
@@ -173,14 +172,14 @@ constexpr auto entries() noexcept
 	-> EntryArray<Enum, NS_DETAIL::enum_values_v<Enum>.size()>
 {
 	using Idx = std::make_index_sequence<NS_DETAIL::enum_values_v<Enum>.size()>;
-    return NS_DETAIL::entries_impl<Enum>(Idx{});
+	return NS_DETAIL::entries_impl<Enum>(Idx{});
 }
 template<typename Enum>
 constexpr std::string_view to_string(Enum v) noexcept
 {
 	for (const auto& [ name, value ]: entries<Enum>()) {
-        if (v == value) return name;
-    }
+		if (v == value) return name;
+	}
 	return {};
 }
 

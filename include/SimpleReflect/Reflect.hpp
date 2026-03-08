@@ -242,10 +242,10 @@ template<reflectable Cls, StaticString Name, std::size_t ...Indices>
 constexpr std::size_t member_index_impl(std::index_sequence<Indices...>)
 {
 	std::size_t result = (std::size_t)-1;
-    ((InfoTupleElem<Cls, Indices>::name == Name
+	((InfoTupleElem<Cls, Indices>::name == Name
 		? (result = Indices) : 0
 	), ...);
-    return result;
+	return result;
 }
 
 NAMESPACE_END(NS_DETAIL)
