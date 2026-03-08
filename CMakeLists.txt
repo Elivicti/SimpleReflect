@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 3.11)
 project(SimpleReflect LANGUAGES CXX VERSION 1.1)
 
+option(BUILD_EXAMPLE "build example program" ${PROJECT_IS_TOP_LEVEL})
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -13,7 +15,9 @@ target_include_directories(
 )
 target_compile_options(${PROJECT_NAME} INTERFACE $<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>)
 
-add_subdirectory(examples)
+if (BUILD_EXAMPLE)
+	add_subdirectory(examples)
+endif()
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
