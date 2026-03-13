@@ -27,10 +27,15 @@ NAMESPACE_BEGIN(NS_REFLECT)
 #undef TXT
 #endif
 
-#if defined(UNICODE) || defined(_UNICODE) || defined(USE_WCHAR)
 #ifndef USE_WCHAR
+#if defined(_WIN32) && (defined(UNICODE) || defined(_UNICODE))
 #define USE_WCHAR 1
+#else
+#define USE_WCHAR 0
 #endif
+#endif
+
+#if defined(USE_WCHAR) && USE_WCHAR
 
 #define TXT_IMPL(x) L ## x
 #define TXT(x) TXT_IMPL(x)
